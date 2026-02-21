@@ -3,39 +3,58 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowRight, Play, Pause } from 'lucide-react';
+import { db } from "@/app/lib/firebase";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 
 import Nav from '../components/nav';
 import Footer from '../components/footer';
 
 const GalleryPage = () => {
+  const [galleryData, setGalleryData] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [index, setIndex] = useState(1);
+  const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const categories = [
-    { id: 'sports', name: 'Sports', folder: '/sports', count: 5 },
-    { id: 'wushu', name: 'Wushu', folder: '/wushu', count: 5 },
-    { id: 'fieldvisit', name: 'Field Visit', folder: '/fieldvisit', count: 5 },
-    { id: 'picnic', name: 'Picnic', folder: '/tour', count: 3 },
-    { id: 'swimming', name: 'Swimming', folder: '/swimming', count: 5 },
-    { id: 'exhibition', name: 'Exhibition', folder: '/exhibition', count: 5},
-  ];
+  useEffect(() => {
+    const fetchGallery = async () => {
+      try {
+        const q = query(collection(db, "gallery"), orderBy("createdAt", "desc"));
+        const snap = await getDocs(q);
+        const rawItems = snap.docs.map(d => d.data());
+        
+        // Group items by category name
+        const grouped = rawItems.reduce((acc, item) => {
+          if (!acc[item.name]) {
+            acc[item.name] = { name: item.name, images: [] };
+          }
+          acc[item.name].images.push(item.path);
+          return acc;
+        }, {});
+
+        setGalleryData(Object.values(grouped));
+      } catch (err) { console.error("Gallery Fetch Error:", err); }
+      setLoading(false);
+    };
+    fetchGallery();
+  }, []);
 
   const paginate = useCallback((newDirection) => {
     if (!selectedCategory) return;
     setDirection(newDirection);
+    const count = selectedCategory.images.length;
     if (newDirection === 1) {
-      setIndex((prev) => (prev === selectedCategory.count ? 1 : prev + 1));
+      setIndex((prev) => (prev === count - 1 ? 0 : prev + 1));
     } else {
-      setIndex((prev) => (prev === 1 ? selectedCategory.count : prev - 1));
+      setIndex((prev) => (prev === 0 ? count - 1 : prev - 1));
     }
   }, [selectedCategory]);
 
   useEffect(() => {
     let interval;
     if (selectedCategory && isAutoPlaying) {
-      interval = setInterval(() => paginate(1), 1500);
+      interval = setInterval(() => paginate(1), 3000); // Increased to 3s for better viewing
     }
     return () => clearInterval(interval);
   }, [selectedCategory, isAutoPlaying, paginate]);
@@ -50,143 +69,148 @@ const GalleryPage = () => {
     <main className="min-h-screen bg-white">
       <Nav />
       
-      {/* --- HERO SECTION: EXACT MATCH TO IMAGE --- */}
-      <section className="relative h-[75vh] md:h-[90vh] flex items-center justify-center overflow-hidden bg-white">
-        {/* Background Image Container */}
+      {/* Hero Section */}
+      <section className="relative h-[60vh] md:h-[80vh] flex items-center justify-center overflow-hidden bg-slate-900">
         <div className="absolute inset-0 z-0">
           <Image 
-            src="/gallery.jpg" // Ensure this is the original photo of the girls
-            alt="Students with Trophies" 
+            src="/gallery.jpg" 
+            alt="Gallery Hero" 
             fill 
-            priority
-            // object-top 25% keeps the girls' faces and trophies in frame even on mobile
-            className="object-cover object-[center_25%]" 
+            priority 
+            className="object-cover object-center opacity-60" 
           />
-          
-          {/* Top Gradient for Nav Legibility */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
-          
-          {/* THE "FADE TO WHITE" EFFECT - Multiple layers for smoothness */}
-          <div className="absolute inset-0 bg-gradient-to-t from-white via-white/30 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-white to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-white" />
         </div>
 
-        {/* Hero Content */}
-        <div className="relative z-10 text-center px-4 md:px-6 max-w-6xl">
-          {/* EST. 1995 Badge */}
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="inline-block bg-red-600 text-white px-3 py-1 rounded-sm text-[10px] md:text-[12px] font-black uppercase tracking-[0.3em] mb-4 shadow-lg"
-          >
-            EST. 1995
-          </motion.div>
-
-          {/* Main Title: EVENT GALLERY */}
-          <motion.h1 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 font-black uppercase tracking-tighter leading-[0.85]"
-          >
-            <span className="text-5xl sm:text-7xl md:text-9xl text-white drop-shadow-[0_5px_15px_rgba(0,0,0,0.4)]">
-              EVENT
-            </span> 
-            <span className="text-5xl sm:text-7xl md:text-9xl text-red-600 drop-shadow-[0_5px_15px_rgba(0,0,0,0.2)]">
-              GALLERY
-            </span>
-          </motion.h1>
-
-          {/* The Red Accent Bar */}
-          <motion.div 
-            initial={{ width: 0 }}
-            animate={{ width: "60px" }}
-            className="h-1.5 md:h-2 bg-red-600 mx-auto mt-6 md:mt-8 rounded-full"
-          />
-
-          {/* Subtitle */}
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="text-white text-lg md:text-2xl font-bold mt-6 md:mt-10 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] max-w-3xl mx-auto leading-tight"
-          >
-            Ganesh English Secondary School: <br className="hidden md:block" />
-            A Temple of Wisdom and Excellence.
-          </motion.p>
+        <div className="relative z-10 text-center px-4 max-w-6xl">
+          <div className="inline-block bg-red-600 text-white px-4 py-1 rounded-sm text-xs font-black uppercase tracking-[0.3em] mb-4 shadow-lg">MEMORIES</div>
+          <h1 className="flex flex-col md:flex-row justify-center items-center gap-2 md:gap-6 font-black uppercase tracking-tighter leading-none">
+            <span className="text-5xl md:text-9xl text-white">EVENT</span> 
+            <span className="text-5xl md:text-9xl text-red-600">GALLERY</span>
+          </h1>
+          <div className="h-2 bg-red-600 mx-auto mt-8 w-20 rounded-full" />
         </div>
       </section>
 
-      {/* --- GALLERY GRID SECTION --- */}
-      <section className="py-16 md:py-24 bg-white relative z-20">
+      {/* Categories Grid */}
+      <section className="py-24 bg-white relative z-20">
         <div className="container mx-auto px-6 max-w-[1400px]">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-14">
-            {categories.map((cat, i) => (
-              <motion.div
-                key={cat.id}
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                onClick={() => { setSelectedCategory(cat); setIndex(1); setIsAutoPlaying(true); }}
-                className="group cursor-pointer"
-              >
-                <div className="relative aspect-[4/3] rounded-[2rem] md:rounded-[3rem] overflow-hidden bg-slate-50 border-[8px] md:border-[14px] border-white shadow-xl transition-all duration-500 group-hover:shadow-red-500/30 group-hover:-translate-y-3">
-                  <Image 
-                    src={`${cat.folder}/1.jpg`} 
-                    alt={cat.name} 
-                    fill 
-                    className="object-cover transition-transform duration-1000 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-red-600/5 transition-colors" />
-                  <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6 p-3 md:p-4 bg-white rounded-xl md:rounded-2xl text-red-600 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all shadow-xl">
-                    <ArrowRight size={20} />
+          {loading ? (
+             <div className="flex justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-14">
+              {galleryData.map((cat) => (
+                <motion.div
+                  key={cat.name}
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  onClick={() => { setSelectedCategory(cat); setIndex(0); setIsAutoPlaying(true); }}
+                  className="group cursor-pointer"
+                >
+                  <div className="relative aspect-[4/3] rounded-[2.5rem] overflow-hidden bg-slate-100 border-[10px] border-white shadow-2xl transition-all duration-500 group-hover:-translate-y-3">
+                    <Image 
+                      src={cat.images[0]} 
+                      alt={cat.name} 
+                      fill 
+                      className="object-cover transition-transform duration-1000 group-hover:scale-110" 
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                    />
+                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
+                    <div className="absolute bottom-6 right-6 p-4 bg-white rounded-2xl text-red-600 opacity-0 group-hover:opacity-100 translate-y-4 group-hover:translate-y-0 transition-all shadow-xl">
+                      <ArrowRight size={20} />
+                    </div>
                   </div>
-                </div>
-                <div className="mt-6 md:mt-8 text-center">
-                  <h3 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tighter group-hover:text-red-600 transition-colors">
-                    {cat.name}
-                  </h3>
-                  <div className="h-1 w-8 bg-red-600 mx-auto mt-2 md:mt-3 rounded-full transition-all duration-500 group-hover:w-24" />
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                  <div className="mt-8 text-center">
+                    <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter group-hover:text-red-600 transition-colors">{cat.name}</h3>
+                    <p className="text-slate-500 font-bold text-sm mt-1 uppercase tracking-widest">{cat.images.length} Photos</p>
+                    <div className="h-1 w-8 bg-red-600 mx-auto mt-3 rounded-full transition-all duration-500 group-hover:w-24" />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* --- MODAL SLIDESHOW --- */}
+      {/* Lightbox Modal */}
       <AnimatePresence>
         {selectedCategory && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-0 md:p-10">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedCategory(null)} className="absolute inset-0 bg-slate-950/98 backdrop-blur-3xl" />
-
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full h-full md:h-auto md:max-w-6xl md:aspect-[16/10] bg-white md:rounded-[4rem] overflow-hidden flex flex-col shadow-2xl">
-              <div className="absolute top-4 left-4 md:top-8 md:left-8 z-50 flex gap-2">
-                 <button onClick={() => setIsAutoPlaying(!isAutoPlaying)} className={`px-4 py-2 rounded-full flex items-center gap-2 font-black text-[10px] uppercase tracking-widest transition-all ${isAutoPlaying ? 'bg-red-600 text-white' : 'bg-white text-slate-900 border'}`}>
-                  {isAutoPlaying ? <Pause size={14} /> : <Play size={14} />} <span>{isAutoPlaying ? 'Playing' : 'Paused'}</span>
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-10">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setSelectedCategory(null)} 
+              className="absolute inset-0 bg-slate-950/95 backdrop-blur-xl" 
+            />
+            
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }} 
+              className="relative w-full h-full max-w-6xl bg-white md:rounded-[3rem] overflow-hidden flex flex-col shadow-2xl"
+            >
+              {/* Controls */}
+              <div className="absolute top-6 left-6 z-50 flex gap-2">
+                 <button 
+                  onClick={() => setIsAutoPlaying(!isAutoPlaying)} 
+                  className={`px-5 py-2.5 rounded-full flex items-center gap-2 font-black text-[10px] uppercase tracking-widest transition-all shadow-lg ${isAutoPlaying ? 'bg-red-600 text-white' : 'bg-white text-slate-900'}`}
+                >
+                  {isAutoPlaying ? <Pause size={14} /> : <Play size={14} />} 
+                  <span>{isAutoPlaying ? 'Playing' : 'Paused'}</span>
                 </button>
               </div>
-              <button onClick={() => setSelectedCategory(null)} className="absolute top-4 right-4 md:top-8 md:right-8 z-50 p-2 md:p-3 bg-slate-900 text-white rounded-full hover:bg-red-600 transition-all shadow-xl"><X size={24} /></button>
 
+              <button 
+                onClick={() => setSelectedCategory(null)} 
+                className="absolute top-6 right-6 z-50 p-3 bg-slate-900 text-white rounded-full hover:bg-red-600 transition-all shadow-xl"
+              >
+                <X size={24} />
+              </button>
+
+              {/* Main Image View */}
               <div className="relative flex-1 bg-slate-50 flex items-center justify-center overflow-hidden">
                 <AnimatePresence initial={false} custom={direction}>
-                  <motion.div key={index} custom={direction} variants={variants} initial="enter" animate="center" exit="exit" transition={{ x: { type: "spring", stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }} className="absolute inset-0 flex items-center justify-center p-4 md:p-16">
+                  <motion.div 
+                    key={index} 
+                    custom={direction} 
+                    variants={variants} 
+                    initial="enter" 
+                    animate="center" 
+                    exit="exit" 
+                    transition={{ x: { type: "spring", stiffness: 300, damping: 30 }, opacity: { duration: 0.2 } }} 
+                    className="absolute inset-0 flex items-center justify-center p-6 md:p-12"
+                  >
                     <div className="relative w-full h-full">
-                      <Image src={`${selectedCategory.folder}/${index}.jpg`} alt="GESS" fill className="object-contain drop-shadow-2xl" priority />
+                      <Image 
+                        src={selectedCategory.images[index]} 
+                        alt="Gallery Large" 
+                        fill 
+                        className="object-contain drop-shadow-2xl" 
+                        priority 
+                        sizes="100vw"
+                      />
                     </div>
                   </motion.div>
                 </AnimatePresence>
+
+                {/* Arrow Navigation */}
+                <button onClick={() => paginate(-1)} className="absolute left-4 z-50 p-4 bg-white/10 hover:bg-white text-white hover:text-red-600 rounded-full transition-all backdrop-blur-md">
+                  <ArrowRight size={24} className="rotate-180" />
+                </button>
+                <button onClick={() => paginate(1)} className="absolute right-4 z-50 p-4 bg-white/10 hover:bg-white text-white hover:text-red-600 rounded-full transition-all backdrop-blur-md">
+                  <ArrowRight size={24} />
+                </button>
               </div>
 
-              <div className="p-8 md:p-16 bg-white flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 border-t border-slate-50">
+              {/* Caption Area */}
+              <div className="p-8 md:p-12 bg-white flex flex-col md:flex-row items-center justify-between gap-6 border-t border-slate-100">
                 <div className="text-center md:text-left">
-                  <h2 className="text-3xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none">{selectedCategory.name}</h2>
-                  <p className="text-red-600 font-black text-[10px] md:text-xs uppercase tracking-[0.2em] mt-2 md:mt-3">PHOTO {index} / {selectedCategory.count}</p>
-                </div>
-                <div className="flex gap-2 md:gap-3">
-                  {Array.from({ length: selectedCategory.count }).map((_, i) => (
-                    <button key={i} onClick={() => { setIndex(i + 1); setIsAutoPlaying(false); }} className={`h-1.5 md:h-2 rounded-full transition-all duration-500 ${i + 1 === index ? 'w-8 md:w-12 bg-red-600' : 'w-2 md:w-3 bg-slate-200'}`} />
-                  ))}
+                  <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter leading-none">{selectedCategory.name}</h2>
+                  <p className="text-red-600 font-black text-xs uppercase tracking-[0.2em] mt-3">PHOTO {index + 1} / {selectedCategory.images.length}</p>
                 </div>
               </div>
             </motion.div>
